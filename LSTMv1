@@ -71,3 +71,56 @@ timesteps = 1
 # noffeatures=df_train.shape[1]
 x_train = df_train.to_numpy().reshape(-1, timesteps, df_train.shape[1])
 x_test = df_test.to_numpy().reshape(-1, timesteps , df_test.shape[1])
+
+def create_autoencoder_lstm(df_ae,encoding_dim=8):
+    df_ae = df_ae.sort_index()
+    num_rows, num_cols = df_ae.shape
+    # Assuming your LSTM input shape should be (timesteps, features)
+    input_layer = Input(shape=(1,num_cols))  # Add 1 for the time dimension
+    lstm_layer = LSTM(64, activation='relu', return_sequences=True)(input_layer)
+    lstm_layer = LSTM(32, activation='relu')(lstm_layer)
+    encoder = Dense(encoding_dim, activation='relu')(lstm_layer)
+    decoder = Dense(num_cols, activation='sigmoid')(encoder)
+
+    autoencoder = Model(inputs=input_layer, outputs=decoder)
+    autoencoder.compile(optimizer='adam', loss='mse')
+    autoencoder.summary()
+
+    return autoencoder
+
+
+# ae_autoencoder_lstm = create_autoencoder_lstm(input_shape=(timesteps, df_train.shape[1]), encoding_dim=10)
+# history_lstm = ae_autoencoder_lstm.fit(x_train, x_train, epochs=2, batch_size=32, validation_split=0.2)
+#
+# # Evaluation
+# df_test_pred = ae_autoencoder_lstm.predict(x_test)
+
+# Use the autoencoder with LSTM
+ae_autoencoder = create_autoencoder_lstm(df_ae, encoding_dim=10)
+
+# Reshape the data for LSTM
+timesteps = 1  # Assuming one timestep
+df_train_reshaped = df_train.values.reshape((df_train.shape[0], timesteps ,df_train.shape[1]))
+df_test_reshaped = df_test.values.reshape((df_test.shape[0], timesteps ,df_test.shape[1]))
+
+# Train the autoencoder with LSTM
+history = ae_autoencoder.fit(df_train_reshaped, df_train_reshaped, epochs=2, batch_size=32, validation_split=0.2)
+
+# Predict on the test set
+df_test_pred = ae_autoencoder.predict(df_test_reshaped)
+
+# mse = np.mean(np.power(x_test - df_test_pred, 2), axis=(1,2))
+mse = np.mean(np.power(df_test.values - df_test_pred.reshape(df_test_pred.shape[0], -1), 2), axis=1)
+
+threshold = np.quantile(mse, 0.97)
+y_pred = [1 if e > threshold else 0 for e in mse]
+y_true = [1 if x == 'Attack' else 0 for x in target_values]
+accuracy = accuracy_score(y_true, y_pred)
+precision = metrics.precision_score(y_true, y_pred)
+recall = metrics.recall_score(y_true, y_pred)
+f1_score = metrics.f1_score(y_true, y_pred)
+
+print(f"Accuracy: {accuracy}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"F1-Score: {f1_score}")
