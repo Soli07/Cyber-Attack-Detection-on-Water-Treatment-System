@@ -1,1 +1,73 @@
+import warnings
+import pandas as pd
+import numpy as np
+import sklearn.metrics as metrics
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tensorflow.keras.layers import Input, Dense, LSTM, RepeatVector
+from tensorflow.keras.models import Model
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# # Load your data
+# df_train = pd.read_csv("C:/Users/youss/OneDrive/Desktop/Graduation project/SWAT Dataset 2015/SWaT_Dataset_Normal_v0.csv")
+# df_train.columns = df_train.columns.str.strip()
+
+df = pd.read_csv("C:/Users/youss/OneDrive/Desktop/Graduation project/SWAT Dataset 2015/SWaT_Dataset_Attack_v0.csv")
+df.columns = df.columns.str.strip()
+# df = pd.concat([df_train, df_test])
+
+# Select a subset of data (adjust as needed)
+# df = df[:600000]
+
+# Preprocess the data
+# df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+# df.rename(columns={'Timestamp': 'Date'}, inplace=True)
+# df = df.set_index('Date')
+df = df.drop(columns=['Timestamp'])
+
+for c in df.columns[:-2]:
+    df[c] = pd.to_numeric(df[c])
+
+for col in df.columns:
+    if len(df[col].unique()) == 1:
+        df.drop(col, inplace=True, axis=1)
+
+# Feature engineering and scaling
+cat_col = []
+num_col = []
+
+for column in df.columns:
+    unique_values = df[column].nunique()
+    if unique_values > 10:
+        num_col.append(column)
+    else:
+        cat_col.append(column)
+
+one_hot_encoded_data = pd.get_dummies(df, columns=cat_col)
+processed_df = one_hot_encoded_data.copy()
+
+min_max_scaler = MinMaxScaler()
+x_scaled = min_max_scaler.fit_transform(processed_df[num_col])
+df_num = pd.DataFrame(x_scaled, index=processed_df.index, columns=num_col)
+
+df_ = pd.concat([df_num, processed_df.drop(columns=num_col)], axis=1)
+
+# PCA for dimensionality reduction
+pca = PCA(n_components=15)
+reduced_data = pca.fit_transform(df_)
+df_ae = pd.DataFrame(reduced_data)
+
+# Train-test split
+df_train = df_ae.iloc[:359935, :]
+df_test = df_ae.iloc[359935:, :]
+target_values = df['Normal/Attack'].iloc[359935:]
+
+# Reshape the data for LSTM
+timesteps = 1
+# noffeatures=df_train.shape[1]
+x_train = df_train.to_numpy().reshape(-1, timesteps, df_train.shape[1])
+x_test = df_test.to_numpy().reshape(-1, timesteps , df_test.shape[1])
