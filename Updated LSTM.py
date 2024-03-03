@@ -11,12 +11,15 @@ import keras.layers
 from keras import Sequential
 from keras.src.layers import TimeDistributed
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, f1_score, precision_score, recall_score
 from keras.layers import Input, Dense, LSTM, RepeatVector
 from keras.models import Model
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
-from tensorflow.python.keras.layers import Dropout
+# from tensorflow.python.keras.layers import Dropout
+from keras.layers import Dropout
+
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -106,23 +109,57 @@ model.fit(X_train, y_train, epochs=2, batch_size=32, validation_data=(X_test, y_
 
 # Make predictions on the test set
 predictions = model.predict(X_test)
-predictions = predictions.flatten()
 
 # Calculate the Mean Squared Error (MSE) for each sample
-mse = np.mean(np.square(y_test - predictions))
+mse = mean_squared_error(y_test, predictions)
+print("Mean Squared Error (MSE):", mse)
 
 # Set a threshold for anomaly detection (you may need to adjust this based on your data)
 threshold = 0.5
 
-predictions_labels = np.where(mse > threshold, 1, 0)
-# predictions_labels = np.argmax(predictions_labels, axis=1)
+predictions_labels = np.where(predictions > threshold, 1, 0)
+predictions_labels = predictions_labels.flatten()
 
 print("pred shape:", predictions_labels.shape)
 print("y test shape:", y_test.shape)
 print("predictions_labels:", predictions_labels)
 print("y_test:", y_test)
+predictions_df = pd.DataFrame(predictions_labels, columns=['Predictions'])
+y_test_df = pd.DataFrame(y_test, columns=['True Labels'])
+
+# Save DataFrames to CSV files
+predictions_df.to_csv("predictions.csv", index=False)
+y_test_df.to_csv("true_labels.csv", index=False)
+
+
+f1 = f1_score(y_test, predictions_labels)
+
+# Calculate precision
+precision = precision_score(y_test, predictions_labels)
+
+# Calculate recall
+recall = recall_score(y_test, predictions_labels)
+
+print("F1 Score:", f1)
+print("Precision:", precision)
+print("Recall:", recall)
+
 
 # Evaluate the model on the test set labels
 accuracy = (np.sum(predictions_labels == y_test) / len(y_test)) *100
-print("Accuracy:", accuracy)
+print("Accuracy:",accuracy)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
